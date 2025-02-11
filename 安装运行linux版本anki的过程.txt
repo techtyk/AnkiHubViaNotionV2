@@ -1,0 +1,5 @@
+   sudo apt update
+   sudo apt install libxcb-cursor0  
+ export QT_QPA_PLATFORM_PLUGIN_PATH=./qt6/plugins/platforms
+   export LD_LIBRARY_PATH=./qt6/lib:$LD_LIBRARY_PATH
+   export ANKI_WAYLAND=1

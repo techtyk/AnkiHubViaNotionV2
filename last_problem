@@ -1,0 +1,21 @@
+以下问题均已解决
+; 1.暂停问题
+; 	无法将notion中的暂停状态保持到anki中，但是反过来可以
+; 2.学习记录的问题
+; 	无法在anki中重建notion中存储的anki学习记录
+;     --元数据都导入anki了
+    ; --复习中的卡片，导入notion，导回anki的时候，到期日无法被设置，需要用户手动设置
+	; overwrite模式下，如果卡片首字段存在特殊字符或url，则导入anki会体现为copy
+	; 导入anki的时候，删除readyMove标签
+	;  -overwrite模式下，anki导入notion的notion正文识别问题+overwrite模式下，notion中不存在笔记，的notion写入没有自动转换为copy写入的问题
+	;  -运行linux环境(wsl、ubuntu)下的anki 24.11源代码
+
+; 3.用户体验提高
+; 	用户应该要能够选择是否导入的时候，是否保留源侧的笔记，比如从notion导入anki的时候，是否保留notion的笔记；从anki导入notion的时候，是否保留anki中笔记。（这需要在AnkiHubViaNotion设置中添加供用户选择的选项）
+	
+
+; 待完成：
+; notion2anki学习中的卡片：
+;             if note_meta.get('card_type') == 1 and note_meta.get('due_date') not in (None, ""):
+;                 # 对于学习中的卡片，需要伪造学习记录，但是需要处理due值！！（之后补充）
+;                 pass

@@ -1,0 +1,9 @@
+{
+    "notion_token": "ntn_U5072988385aTiNppSnEuhR8NneQ2xDh84qyAPpA1eqaJx",
+    "notion_database_url": "https://www.notion.so/19512e5fa8e18077a8dcf092400b4381?v=19512e5fa8e181c5995d000c48457ed4",
+    "anki_query_string": "note:问答题",
+    "duplicate_handling_way": "overwrite",
+    "retain_source_note": false,
+    "language": "中文",
+    "retain_notion_children": true
+}
