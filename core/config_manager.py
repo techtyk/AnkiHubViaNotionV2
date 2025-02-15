@@ -15,13 +15,13 @@ class ConfigManager:
         return cls._instance
 
     def load_config(self):
-        config_path = os.path.join(os.path.dirname(__file__), '../../config.json')
+        config_path = os.path.join(os.path.dirname(__file__), '../config.json')
         if os.path.exists(config_path):
             with open(config_path, 'r', encoding='utf-8') as f:
                 self._config = json.load(f)
 
     def save_config(self):
-        config_path = os.path.join(os.path.dirname(__file__), '../../config.json')
+        config_path = os.path.join(os.path.dirname(__file__), '../config.json')
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(self._config, f, ensure_ascii=False, indent=2)
 
