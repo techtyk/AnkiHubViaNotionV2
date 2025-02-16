@@ -32,12 +32,20 @@ class NotionClient:
                     if op.get('handling') == 'overwrite':
                         # 获取第一个匹配页面ID，并进行更新
                         page_id = query['results'][0]['id']
-                        update_response = self.client.pages.update(page_id=page_id, properties=op['data'])
+                        # 先删除旧页面再创建新页面（模仿V1版本345-382行）
+                        self.client.blocks.delete(block_id=page_id)
+                        # 创建新页面（携带children参数）
+                        create_response = self.client.pages.create(
+                            parent={'database_id': database_id},
+                            properties=op['data'],
+                            children=op.get('children', [])
+                        )
                         success.append({
                             'operation': op,
-                            'action': 'update',
-                            'page_id': page_id,
-                            'response': update_response,
+                            'action': 'overwrite',
+                            'old_page_id': page_id,
+                            'new_page_id': create_response['id'],
+                            'response': create_response,
                         })
                     else:
                         # 配置不是 overwrite 的情况下，跳过更新
@@ -51,7 +59,8 @@ class NotionClient:
                     # 无重复，则创建新的 Notion 页面，parent 参数为数据库 ID
                     create_response = self.client.pages.create(
                         parent={'database_id': database_id},
-                        properties=op['data']
+                        properties=op['data'],
+                        children=op.get('children', [])
                     )
                     success.append({
                         'operation': op,

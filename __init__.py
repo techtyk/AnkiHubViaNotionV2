@@ -6,6 +6,7 @@ from .core.config_manager import ConfigManager
 from .core.sync_executor import SyncExecutor
 from .core.sync_strategy import AnkiToNotionStrategy, NotionToAnkiStrategy
 
+
 plugin_root = os.path.dirname(__file__)
 lib_path = os.path.abspath(os.path.join(plugin_root, 'lib'))
 if lib_path not in sys.path:
