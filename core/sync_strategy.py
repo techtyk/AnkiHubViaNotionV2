@@ -5,6 +5,8 @@ from datetime import datetime
 from aqt import mw
 from ..utils.helpers import Helpers
 import json
+import os
+from .notion_client import NotionClient
 
 VALID_LANGUAGES = {'python', 'javascript', 'java', 'c', 'c++', 'c#', 'html', 'css', 
                   'sql', 'typescript', 'php', 'ruby', 'go', 'swift', 'kotlin', 
@@ -23,7 +25,6 @@ class AnkiToNotionStrategy(SyncStrategy):
     
     def execute(self, config: Dict[str, Any]):
         # 初始化 Notion 客户端，并提取数据库ID
-        from .notion_client import NotionClient
         client = NotionClient(config.get('notion_token'))
         database_id = Helpers.extract_database_id(config.get('notion_database_url'))
 
@@ -46,13 +47,16 @@ class AnkiToNotionStrategy(SyncStrategy):
 
     
     def _update_notion_database(self, note_ids, config):
-        """更新Notion数据库（自动添加缺失字段、修正属性类型及重复检查逻辑）"""
-        from .notion_client import NotionClient
-
-        # 初始化 Notion 客户端，并提取数据库ID
+        """
+        更新 Notion 数据库。每次调用时都通过 mw.addonManager.getConfig 获取最新配置，
+        这样用户在设置界面修改 duplicate_handling_way 后不必重启 Anki 就能生效。
+        """
+        # 修改为显式指定插件主模块名称
+        config = mw.addonManager.getConfig("anki_repository_v2")
+        
+        # 初始化 Notion 客户端，并提取数据库 ID
         client = NotionClient(config.get('notion_token'))
         database_id = Helpers.extract_database_id(config.get('notion_database_url'))
-
         
         # 针对每条笔记构造 Notion 页面数据
         batch_operations = []
@@ -64,31 +68,44 @@ class AnkiToNotionStrategy(SyncStrategy):
             processed_note = self._process_note(note)
             properties = self._convert_into_notion_properties(processed_note, config)
             
-            # 构造重复检查条件
-            first_field_value = properties["First Field"]["rich_text"][0]["text"]["content"]
+            # 修改重复检查条件：
+            # 1. 从 "First Field" 读取真实的首字段名称
+            # 2. 再从 properties 中取出该字段的实际值
+            first_field_property_name = properties["First Field"]["rich_text"][0]["text"]["content"]
+            first_field_value = properties[first_field_property_name]["rich_text"][0]["text"]["content"]
             duplicate_check = {
                 "filter": {
                     "and": [
-                        {"property": "Note Type", "rich_text": {"equals": properties["Note Type"]["rich_text"][0]["text"]["content"]}},
-                        {"property": "first_field", "rich_text": {"equals": first_field_value}}
+                        {
+                            "property": "Note Type",
+                            "rich_text": {
+                                "equals": properties["Note Type"]["rich_text"][0]["text"]["content"]
+                            }
+                        },
+                        {
+                            "property": first_field_property_name,
+                            "rich_text": {
+                                "equals": first_field_value
+                            }
+                        }
                     ]
                 }
             }
             # 构造 operation 字典
             operation = {
                 "data": properties,
-                "duplicate_check": duplicate_check,
-                "handling": config.get("duplicate_handling_way", "keep")
+                "duplicate_check": duplicate_check
             }
             if notion_children:
                 operation["children"] = notion_children
             batch_operations.append(operation)
         
-        # 调用 NotionClient 内的批量更新接口
+        # 调用 NotionClient 内的批量更新接口，传入最新的配置
         result = client.batch_update_database(
             database_id=database_id,
             operations=batch_operations,
-            retain_source=config.get("retain_source_note", True)
+            retain_source=config.get("retain_source_note", True),
+            config=config
         )
         return result
 

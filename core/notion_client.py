@@ -2,6 +2,7 @@
 
 from notion_client import Client
 import traceback
+from aqt.qt import debug
 
 class NotionClient:
     def __init__(self, token):
@@ -11,44 +12,64 @@ class NotionClient:
         self.token = token
         self.client = Client(auth=token)
 
-    def batch_update_database(self, database_id, operations, retain_source):
+    def batch_update_database(self, database_id, operations, retain_source, config):
         """
         批量更新 Notion 数据库：
-          - 对于每一条操作，根据 duplicate_check 判断是否已有重复页面
-          - 如果已有重复页面且配置为 'overwrite'，则更新该页面
-          - 如果无重复，则创建新页面
-
+          - copy 模式直接创建新页面，不检查重复
+          - 对于其它模式：如果存在重复页面，则根据模式进行覆盖或跳过；如果无重复，则创建新页面
         返回一个字典：{'success': [...], 'failed': [...]}
         """
         success = []
         failed = []
         for op in operations:
             try:
-                # duplicate_check 中包含 Notion API 可用的过滤器格式
+                # 每次循环时从最新的配置中读取处理模式
+                mode = config.get("duplicate_handling_way", "keep").lower()
+
+                # copy 模式：直接创建新页面
+                if mode == "copy":
+                    create_response = self.client.pages.create(
+                        parent={'database_id': database_id},
+                        properties=op['data'],
+                        children=op.get('children', [])
+                    )
+                    success.append({
+                        'operation': op,
+                        'action': 'create',
+                        'page_id': create_response['id'],
+                        'response': create_response,
+                    })
+                    continue
+
+                # 其它模式：先进行重复检查
                 dup_filter = op['duplicate_check']['filter']
                 query = self.client.databases.query(database_id=database_id, filter=dup_filter)
                 # 如果存在重复页面
                 if query.get('results'):
-                    if op.get('handling') == 'overwrite':
-                        # 获取第一个匹配页面ID，并进行更新
+                    if mode == "overwrite":
+                        # 覆盖：更新已存在页面
                         page_id = query['results'][0]['id']
-                        # 先删除旧页面再创建新页面（模仿V1版本345-382行）
-                        self.client.blocks.delete(block_id=page_id)
-                        # 创建新页面（携带children参数）
-                        create_response = self.client.pages.create(
-                            parent={'database_id': database_id},
+                        update_response = self.client.pages.update(
+                            page_id=page_id,
                             properties=op['data'],
                             children=op.get('children', [])
                         )
                         success.append({
                             'operation': op,
-                            'action': 'overwrite',
-                            'old_page_id': page_id,
-                            'new_page_id': create_response['id'],
-                            'response': create_response,
+                            'action': 'update',
+                            'page_id': page_id,
+                            'response': update_response,
+                        })
+                    elif mode == "keep":
+                        # 保留：跳过更新，保持现有页面
+                        success.append({
+                            'operation': op,
+                            'action': 'skip',
+                            'page_id': query['results'][0]['id'],
+                            'response': None,
                         })
                     else:
-                        # 配置不是 overwrite 的情况下，跳过更新
+                        # 默认情况，同 keep
                         success.append({
                             'operation': op,
                             'action': 'skip',
@@ -56,7 +77,7 @@ class NotionClient:
                             'response': None,
                         })
                 else:
-                    # 无重复，则创建新的 Notion 页面，parent 参数为数据库 ID
+                    # 若不存在重复，则创建新的 Notion 页面
                     create_response = self.client.pages.create(
                         parent={'database_id': database_id},
                         properties=op['data'],
@@ -72,6 +93,7 @@ class NotionClient:
                 traceback.print_exc()
                 failed.append({
                     'operation': op,
-                    'error': str(e)
+                    'error': str(e),
+                    'trace': traceback.format_exc()
                 })
         return {'success': success, 'failed': failed}

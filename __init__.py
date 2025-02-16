@@ -2,15 +2,20 @@ import os
 import sys
 from aqt import mw
 from aqt.qt import QAction
-from .core.config_manager import ConfigManager
-from .core.sync_executor import SyncExecutor
-from .core.sync_strategy import AnkiToNotionStrategy, NotionToAnkiStrategy
-
 
 plugin_root = os.path.dirname(__file__)
 lib_path = os.path.abspath(os.path.join(plugin_root, 'lib'))
+# 将 lib 目录插入到 sys.path 的首位
 if lib_path not in sys.path:
-    sys.path.append(lib_path)
+    sys.path.insert(0, lib_path)
+
+# 可以添加调试输出，确认 lib 目录是否存在 notion_client 模块
+print("lib_path:", lib_path)
+print("lib目录内容:", os.listdir(lib_path))
+
+from .core.config_manager import ConfigManager
+from .core.sync_executor import SyncExecutor
+from .core.sync_strategy import AnkiToNotionStrategy, NotionToAnkiStrategy
 
 # 初始化配置管理器（单例模式）
 config_manager = ConfigManager()
