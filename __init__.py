@@ -1,8 +1,15 @@
+import os
+import sys
 from aqt import mw
 from aqt.qt import QAction
 from .core.config_manager import ConfigManager
 from .core.sync_executor import SyncExecutor
 from .core.sync_strategy import AnkiToNotionStrategy, NotionToAnkiStrategy
+
+plugin_root = os.path.dirname(__file__)
+lib_path = os.path.abspath(os.path.join(plugin_root, 'lib'))
+if lib_path not in sys.path:
+    sys.path.append(lib_path)
 
 # 初始化配置管理器（单例模式）
 config_manager = ConfigManager()
@@ -32,13 +39,11 @@ def open_settings():
 
 def start_anki_to_notion():
     executor = SyncExecutor()
-    strategy = AnkiToNotionStrategy(config_manager)
-    executor.submit_task(strategy.sync)
+    executor.execute_strategy(AnkiToNotionStrategy())
 
 def start_notion_to_anki():
     executor = SyncExecutor()
-    strategy = NotionToAnkiStrategy(config_manager)
-    executor.submit_task(strategy.sync)
+    executor.execute_strategy(NotionToAnkiStrategy())
 
 # 插件加载时初始化
 mw.addonManager.setWebExports(__name__, r"lib/.*(css|js)")

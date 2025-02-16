@@ -3,7 +3,7 @@ from multiprocessing import Process
 from .config_manager import ConfigManager
 
 class SyncExecutor:
-    """多进程任务执行器（工厂模式）"""
+    """多进程任务执行器（命令模式）"""
     
     def __init__(self):
         self.config = ConfigManager()
@@ -12,7 +12,7 @@ class SyncExecutor:
         """启动子进程执行策略"""
         def worker():
             strategy.execute(self.config)
-        
-        p = Process(target=worker)
-        p.start()
-        # 先不处理进程间通信，保持简单
+        worker()    
+        # p = Process(target=worker)
+        # p.start()
+        # 先不实现多进程，保持简单
