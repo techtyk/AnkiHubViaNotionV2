@@ -2,7 +2,7 @@
 
 from notion_client import Client
 import traceback
-from aqt.qt import debug
+
 
 class NotionClient:
     def __init__(self, token):
@@ -12,7 +12,7 @@ class NotionClient:
         self.token = token
         self.client = Client(auth=token)
 
-    def batch_update_database(self, database_id, operations, retain_source, config):
+    def batch_update_database(self, database_id, operations, delete_source, config):
         """
         批量更新 Notion 数据库：
           - copy 模式直接创建新页面，不检查重复
@@ -21,6 +21,7 @@ class NotionClient:
         """
         success = []
         failed = []
+
         for op in operations:
             try:
                 # 每次循环时从最新的配置中读取处理模式
@@ -96,4 +97,8 @@ class NotionClient:
                     'error': str(e),
                     'trace': traceback.format_exc()
                 })
-        return {'success': success, 'failed': failed}
+
+        return {
+            'success': success,
+            'failed': failed
+        }

@@ -7,6 +7,7 @@ from ..utils.helpers import Helpers
 import json
 import os
 from .notion_client import NotionClient
+from aqt.qt import debug
 
 VALID_LANGUAGES = {'python', 'javascript', 'java', 'c', 'c++', 'c#', 'html', 'css', 
                   'sql', 'typescript', 'php', 'ruby', 'go', 'swift', 'kotlin', 
@@ -23,16 +24,29 @@ class SyncStrategy(ABC):
 class AnkiToNotionStrategy(SyncStrategy):
     """Anki → Notion 同步策略"""
     
-    def execute(self, config: Dict[str, Any]):
-        # 初始化 Notion 客户端，并提取数据库ID
-        client = NotionClient(config.get('notion_token'))
-        database_id = Helpers.extract_database_id(config.get('notion_database_url'))
+    def __init__(self, config: Dict[str, Any]):
+        # 初始化 Notion 客户端
+        self.client = NotionClient(config.get('notion_token'))
+        self.database_id = Helpers.extract_database_id(config.get('notion_database_url'))
 
+    def execute(self, config: Dict[str, Any]):
         # 具体实现分为3个步骤:1-提取ids，2-确保数据库符合预期，3-更新notion数据库
         note_ids = self._get_anki_notes_ids()
         # 确保数据库结构符合预期，不存在或类型不匹配的属性自动更新
-        self._ensure_database_structure(client, database_id, note_ids)
+        self._ensure_database_structure(note_ids)
         result = self._update_notion_database(note_ids, config)
+        
+        # 根据返回结果提取实际成功同步的笔记ID
+        '''添加 if op.get("operation") 的作用是为了筛选出那些实际进行了"操作"的记录。原因如下：
+        在某些重复处理策略下（例如"keep"模式），如果笔记被判断为重复，可能不会真正调用创建或更新操作，而是直接跳过同步。在这种情况下，返回的记录可能没有包含有效的 "operation" 数据。
+        当我们计划删除源侧（Anki）的笔记时，我们希望只删除那些已经实际同步成功并且确实进行了创建或更新操作的笔记。通过判断 op.get("operation")，可以排除掉那些被跳过（记录中可能没有 operation 信息）的笔记，从而避免误删。'''
+        # debug()
+        succeeded_ids = [item["operation"]["note_id"] for item in result.get("success", []) if item.get("action") in ["create", "update"]]
+        
+        # 根据配置决定是否删除源笔记（V2逻辑：配置项为True时删除）
+        if config.get("delete_source_note"):
+            self._delete_source_notes(succeeded_ids)
+        
         self._show_sync_result(result)
 
     def _get_anki_notes_ids(self):
@@ -43,9 +57,6 @@ class AnkiToNotionStrategy(SyncStrategy):
         note_ids = mw.col.find_notes(query)
         return note_ids
 
-    
-
-    
     def _update_notion_database(self, note_ids, config):
         """
         更新 Notion 数据库。每次调用时都通过 mw.addonManager.getConfig 获取最新配置，
@@ -54,9 +65,7 @@ class AnkiToNotionStrategy(SyncStrategy):
         # 修改为显式指定插件主模块名称
         config = mw.addonManager.getConfig("anki_repository_v2")
         
-        # 初始化 Notion 客户端，并提取数据库 ID
-        client = NotionClient(config.get('notion_token'))
-        database_id = Helpers.extract_database_id(config.get('notion_database_url'))
+
         
         # 针对每条笔记构造 Notion 页面数据
         batch_operations = []
@@ -94,17 +103,18 @@ class AnkiToNotionStrategy(SyncStrategy):
             # 构造 operation 字典
             operation = {
                 "data": properties,
-                "duplicate_check": duplicate_check
+                "duplicate_check": duplicate_check,
+                "note_id": note_id
             }
             if notion_children:
                 operation["children"] = notion_children
             batch_operations.append(operation)
         
-        # 调用 NotionClient 内的批量更新接口，传入最新的配置
-        result = client.batch_update_database(
-            database_id=database_id,
+        # 调用 NotionClient 内的批量更新接口
+        result = self.client.batch_update_database(
+            database_id=self.database_id,
             operations=batch_operations,
-            retain_source=config.get("retain_source_note", True),
+            delete_source=config.get("delete_source_note"),
             config=config
         )
         return result
@@ -179,10 +189,10 @@ class AnkiToNotionStrategy(SyncStrategy):
                 properties[field] = {"rich_text": [{"text": {"content": str(value)}}]}
         return properties
 
-    def _ensure_database_structure(self, client, database_id, note_ids):
+    def _ensure_database_structure(self, note_ids):
         """自动更新数据库结构，补充缺失或类型不匹配的属性"""
         try:
-            db_info = client.client.databases.retrieve(database_id=database_id)
+            db_info = self.client.client.databases.retrieve(database_id=self.database_id)
         except Exception as e:
             print("无法获取数据库结构信息:", e)
             return {"success": [], "failed": [{"error": "无法获取数据库结构信息"}]}
@@ -192,18 +202,17 @@ class AnkiToNotionStrategy(SyncStrategy):
         # 收集所有待同步笔记中出现的字段
         required_fields = set()
         for note_id in note_ids:
-
             note = mw.col.get_note(note_id)
             required_fields.update(note.keys())
         
-        # 添加必须的元数据字段（参考 anki2notion.py 77-78 行）
+        # 添加必须的元数据字段
         required_fields.update({'Anki ID', 'Deck', 'Tags', 'Note Type', 'First Field', 
                               'Creation Time', 'Modification Time', 'Review Count', 
                               'Ease Factor', 'Interval', 'Card Type', 'Due Date', 
                               'Suspended', 'Lapses', 'Difficulty', 'Stability', 'Retrievability'})
         if "notion正文" in required_fields:
             required_fields.discard("notion正文")   #notion正文并不是必要字段（应该放到notion_children中，而不是属性中）
-        # 定义预期属性类型映射（参考 anki2notion 的实现）
+        # 定义预期属性类型映射
         expected_types = {}
         for field in required_fields:
             if field in {"Creation Time", "Modification Time", "Due Date"}:
@@ -226,8 +235,8 @@ class AnkiToNotionStrategy(SyncStrategy):
 
         if new_properties:
             try:
-                response = client.client.databases.update(
-                    database_id=database_id,
+                response = self.client.client.databases.update(
+                    database_id=self.database_id,
                     properties=new_properties
                 )
                 print("自动更新数据库结构，添加/更新属性：", list(new_properties.keys()))
@@ -296,6 +305,13 @@ class AnkiToNotionStrategy(SyncStrategy):
                 })
         
         return children
+
+    def _delete_source_notes(self, succeeded_note_ids):
+        """安全删除已成功同步的源笔记"""
+        if not succeeded_note_ids:
+            return
+        mw.col.remNotes(succeeded_note_ids)
+        mw.reset()
 
 class NotionToAnkiStrategy(SyncStrategy):
     """Notion → Anki 同步策略"""

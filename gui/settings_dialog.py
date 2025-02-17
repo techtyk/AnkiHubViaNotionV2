@@ -24,30 +24,30 @@ def save_config(config):
 # 语言文本字典
 LANGUAGE_TEXTS = {
     '中文': {
-        'window_title': 'AnkiHubViaNotion 设置',
+        'window_title': 'AnkiRepository 设置',
         'interface_language': '界面语言：',
         'notion_token': 'Notion Token:',
         'notion_db_url': 'Notion Database URL:',
         'anki_query_string': 'Anki 查询字符串:',
         'duplicate_handling': '重复卡片处理方式(keep/overwrite/copy):',
-        'retain_source_note': '保留源侧笔记',
+        'delete_source_note': '删除源侧笔记',
         'save': '保存',
         'prompt': '提示',
         'settings_saved': '设置已保存',
         'notion_children_option': '将Notion笔记导入Anki时保留正文'
     },
     'English': {
-        'window_title': 'AnkiHubViaNotion Settings',
+        'window_title': 'AnkiRepository Settings',
         'interface_language': 'Interface Language:',
         'notion_token': 'Notion Token:',
         'notion_db_url': 'Notion Database URL:',
         'anki_query_string': 'Anki Query String:',
         'duplicate_handling': 'Duplicate Handling (keep/overwrite/copy):',
-        'retain_source_note': 'Retain Source Note',
+        'delete_source_note': 'Delete Source Note',
         'save': 'Save',
         'prompt': 'Prompt',
         'settings_saved': 'Settings Saved',
-        'notion_children_option': 'Retain Notion Content'
+        'notion_children_option': 'Retain Notion Content When'
     }
 }
 
@@ -101,8 +101,8 @@ class SettingsDialog(QDialog):
         self.layout.addWidget(self.duplicate_handling_input)
 
         # Retain Source Note
-        self.retain_source_checkbox = QCheckBox(self.texts['retain_source_note'])
-        self.layout.addWidget(self.retain_source_checkbox)
+        self.delete_source_checkbox = QCheckBox(self.texts['delete_source_note'])
+        self.layout.addWidget(self.delete_source_checkbox)
 
         # Retain Notion Content
         self.notion_children_checkbox = QCheckBox(self.texts['notion_children_option'])
@@ -137,7 +137,7 @@ class SettingsDialog(QDialog):
         self.notion_db_url_label.setText(self.texts['notion_db_url'])
         self.anki_query_label.setText(self.texts['anki_query_string'])
         self.duplicate_handling_label.setText(self.texts['duplicate_handling'])
-        self.retain_source_checkbox.setText(self.texts['retain_source_note'])
+        self.delete_source_checkbox.setText(self.texts['delete_source_note'])
         self.notion_children_checkbox.setText(self.texts['notion_children_option'])
         self.save_button.setText(self.texts['save'])
 
@@ -147,7 +147,7 @@ class SettingsDialog(QDialog):
         self.notion_db_url_input.setText(self.config.get('notion_database_url', ''))
         self.anki_query_input.setText(self.config.get('anki_query_string', ''))
         self.duplicate_handling_input.setText(self.config.get('duplicate_handling_way', 'keep'))
-        self.retain_source_checkbox.setChecked(self.config.get('retain_source_note', True))
+        self.delete_source_checkbox.setChecked(self.config.get('delete_source_note', True))
         self.notion_children_checkbox.setChecked(self.config.get('retain_notion_children', False))
         self.language_combo.setCurrentText(self.config.get('language', '中文'))
 
@@ -158,7 +158,7 @@ class SettingsDialog(QDialog):
             'notion_database_url': self.notion_db_url_input.text(),
             'anki_query_string': self.anki_query_input.text(),
             'duplicate_handling_way': self.duplicate_handling_input.text(),
-            'retain_source_note': self.retain_source_checkbox.isChecked(),
+            'delete_source_note': self.delete_source_checkbox.isChecked(),
             'retain_notion_children': self.notion_children_checkbox.isChecked(),
             'language': self.language_combo.currentText()
         })

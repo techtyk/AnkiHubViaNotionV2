@@ -9,7 +9,7 @@ lib_path = os.path.abspath(os.path.join(plugin_root, 'lib'))
 if lib_path not in sys.path:
     sys.path.insert(0, lib_path)
 
-# 可以添加调试输出，确认 lib 目录是否存在 notion_client 模块
+
 print("lib_path:", lib_path)
 print("lib目录内容:", os.listdir(lib_path))
 
@@ -44,8 +44,9 @@ def open_settings():
     dialog.exec()
 
 def start_anki_to_notion():
+    config = mw.addonManager.getConfig(__name__)  # 获取当前插件配置
     executor = SyncExecutor()
-    executor.execute_strategy(AnkiToNotionStrategy())
+    executor.execute_strategy(AnkiToNotionStrategy(config))  # 传入配置参数
 
 def start_notion_to_anki():
     executor = SyncExecutor()
