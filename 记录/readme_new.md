@@ -9,24 +9,9 @@ AnkiRepository_V1.0 这个文件夹是重构后的插件代码的工作目录，
   需要提高代码的可维护性和可拓展性。减少代码之间的耦合和代码重复，增加抽象和接口。加入多进程，同时避免阻塞主进程导致anki卡顿。
   可能需要使用策略模式，工厂模式和观察者模式
   未来可能还需要拓展插件，实现 Anki 与 Get 笔记之间的互导。
-  可考虑的代码结构：
-  ```
-  AnkiRepository_V2.0/
-├── core/
-│   ├── sync_strategy.py       # 策略模式相关（定义各同步方式的核心接口）
-│   ├── config_manager.py      # 配置管理（单例模式、观察者模式）
-│   ├── notion_client.py       # 封装 Notion API 的操作
-│   └── sync_executor.py       # 专门负责多进程任务调度和管理
-├── models/
-│   ├── note.py           # 笔记数据模型
-│   └── sync_result.py    # 同步结果模型
-├── utils/
-│   ├── field_mapper.py   # 字段映射处理
-│   └── logger.py         # 统一日志处理
-└── __init__.py           # 插件入口
-  ```
+
 重构路线建议：
-- 先建立核心接口（SyncStrategy）
+- 先建立核心接口（Strategy）
 - 将现有函数拆分为领域对象（Note, Config等）
 - 用依赖注入替换硬编码的配置访问
 - 用装饰器统一处理异常和日志

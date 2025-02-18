@@ -1,30 +1,33 @@
-import re
-from datetime import datetime
-from aqt.qt import debug
-from aqt import mw
-import json
 
-class Helpers:
-    def __init__(self):
-        pass
+
+
+class Note:
+    # Note类负责提取和写入anki数据
+
+    
 
     @staticmethod
-    def extract_database_id(url):
-        """从 Notion 数据库链接中提取数据库 ID"""
-        try:
-            # 去除 URL 中的连字符和查询参数
-            url_clean = url.replace('-', '').split('?', 1)[0]
-            # 匹配 32 位十六进制的数据库 ID
-            match = re.search(r'([0-9a-fA-F]{32})', url_clean)
-            if match:
-                database_id = match.group(1)
-                # 格式化为带连字符的 UUID 形式
-                database_id = f"{database_id[0:8]}-{database_id[8:12]}-{database_id[12:16]}-{database_id[16:20]}-{database_id[20:]}"
-                return database_id
-            else:
-                return None
-        except Exception as e:
-            return None
+    def get_meta_fields_from_anki(note):
+        """从anki数据库中提取元数据字段（参考 anki2notion.py 207-261 行）"""
+        card = note.cards()[0] if note.cards() else None
+        meta_fields_from_anki={
+            "Anki ID": str(note.id),
+            "Deck": mw.col.decks.get(card.did)["name"] if card else "",
+            "Tags": ", ".join(note.tags),
+            "Note Type": note.note_type()["name"] if note.note_type() else "",
+            "Card Type": card.type,
+            "First Field": list(note.keys())[0] if note.keys() else "",
+            "Creation Time": datetime.fromtimestamp(note.id / 1000 ,tz=datetime.now().astimezone().tzinfo).isoformat(),
+            "Modification Time": datetime.fromtimestamp(note.mod,tz=datetime.now().astimezone().tzinfo).isoformat(),
+            "Due Date": Note.get_card_due_date(card).isoformat() if Note.get_card_due_date(card) else None,  # 空值设为None避免发送空字符串
+            "Review Count": card.reps if card else 0,
+            "Ease Factor": card.factor / 1000 if card else 0,
+            "Interval": card.ivl if card else 0,
+            "Lapses": card.lapses if card else 0,
+            "Suspended":card.queue == -1,
+        }
+        meta_fields_from_anki = Note.write_fsrs_data(note, meta_fields_from_anki)
+        return meta_fields_from_anki
     @staticmethod
     def get_card_due_date(card):
         """根据卡片信息获取到期日期"""
@@ -69,5 +72,5 @@ class Helpers:
                     properties['Retrievability'] = {'number': card_data_json['dr']}
                     
         except Exception as e:
-            debug()
+            print(e)
         return properties
