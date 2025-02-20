@@ -1,9 +1,9 @@
 
-
+import datetime
+from aqt import mw
 
 class Note:
     # Note类负责提取和写入anki数据
-
     
 
     @staticmethod

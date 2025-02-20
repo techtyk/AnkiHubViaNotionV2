@@ -1,4 +1,9 @@
 #处理anki笔记和各平台之间的笔记转换的问题
+import re
+
+VALID_LANGUAGES = {'python', 'javascript', 'java', 'c', 'c++', 'c#', 'html', 'css', 
+                  'sql', 'typescript', 'php', 'ruby', 'go', 'swift', 'kotlin', 
+                  'plain text'}  # 根据Notion API支持的语言列表精简
 
 def parse_notion_https_for_database_id(url):
     """从 Notion 数据库链接中提取数据库 ID"""
