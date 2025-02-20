@@ -8,7 +8,7 @@ from ..models.note import Note
 import json
 import os
 from ..client.notion_client import NotionClient
-from ..models.converter import ToNotionConverter
+from ..models.parse_and_converter import ToNotionConverter,parse_notion_https_for_database_id
 from aqt.qt import debug
 from .config_manager import ConfigManager
 
@@ -85,7 +85,7 @@ class AnkiToNotionStrategy(SourceToTargetSyncStrategy):
         # 初始化时获取最新配置
         self.config_manager.reload_config()
         self.client = NotionClient(self.config_manager.get('notion_token'))
-        self.database_id = Helpers.extract_database_id(self.config_manager.get('notion_database_url'))
+        self.database_id = parse_notion_https_for_database_id(self.config_manager.get('notion_database_url'))
     
     @staticmethod
     def get_ids_from_source():
