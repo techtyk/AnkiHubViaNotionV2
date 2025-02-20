@@ -11,10 +11,9 @@ from ..client.notion_client import NotionClient
 from ..models.parse_and_converter import ToNotionConverter,parse_notion_https_for_database_id
 from aqt.qt import debug
 from .config_manager import ConfigManager
+from .note_factory import NoteFactory
 
-VALID_LANGUAGES = {'python', 'javascript', 'java', 'c', 'c++', 'c#', 'html', 'css', 
-                  'sql', 'typescript', 'php', 'ruby', 'go', 'swift', 'kotlin', 
-                  'plain text'}  # 根据Notion API支持的语言列表精简
+
 
 class SourceToTargetSyncStrategy(ABC):
     """同步策略抽象基类（策略模式）"""
@@ -160,25 +159,25 @@ class AnkiToNotionStrategy(SourceToTargetSyncStrategy):
         # 针对每条笔记构造 Notion 页面数据
         batch_operations = []
         for note_id in note_ids:
-            note = mw.col.get_note(note_id)
-            note_body = note["notion正文"].strip() if "notion正文" in note.keys() else ""
-            notion_children = ToNotionConverter.convert_anki_html_to_notion_children(note_body) if note_body else None
-
-            processed_note = self._process_note(note,"notion正文")
-            properties = self._convert_into_notion_properties(processed_note)
+            anki_note = NoteFactory.create("anki", note_id)
             
+            operation = {
+                "data": self._convert_properties(anki_note.get_properties()),
+                "children": anki_note.get_children(),
+                "note_id": note_id
+            }
             # 修改重复检查条件：
             # 1. 从 "First Field" 读取真实的首字段名称
             # 2. 再从 properties 中取出该字段的实际值
-            first_field_property_name = properties["First Field"]["rich_text"][0]["text"]["content"]
-            first_field_value = properties[first_field_property_name]["rich_text"][0]["text"]["content"]
+            first_field_property_name = operation["data"]["First Field"]["rich_text"][0]["text"]["content"]
+            first_field_value = operation["data"][first_field_property_name]["rich_text"][0]["text"]["content"]
             duplicate_check = {
                 "filter": {
                     "and": [
                         {
                             "property": "Note Type",
                             "rich_text": {
-                                "equals": properties["Note Type"]["rich_text"][0]["text"]["content"]
+                                "equals": operation["data"]["Note Type"]["rich_text"][0]["text"]["content"]
                             }
                         },
                         {
@@ -190,14 +189,7 @@ class AnkiToNotionStrategy(SourceToTargetSyncStrategy):
                     ]
                 }
             }
-            # 构造 operation 字典
-            operation = {
-                "data": properties,
-                "duplicate_check": duplicate_check,
-                "note_id": note_id
-            }
-            if notion_children:
-                operation["children"] = notion_children
+            operation["duplicate_check"] = duplicate_check
             batch_operations.append(operation)
         
         # 调用 NotionClient 内的批量更新接口
@@ -230,12 +222,12 @@ class AnkiToNotionStrategy(SourceToTargetSyncStrategy):
 
 
     @staticmethod
-    def _convert_into_notion_properties(note_data):
+    def _convert_properties(properties):
         """
         根据处理后的笔记数据构建 Notion 页面属性字典
         """
         properties = {}
-        for field, value in note_data.items():
+        for field, value in properties.items():
             if value is None:
                 continue
             if field in {"Creation Time", "Modification Time", "Due Date"}:
