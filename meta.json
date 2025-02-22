@@ -1,0 +1,10 @@
+{
+    "name": "AnkiRepositoryV2",
+    "package": "anki_repository_v2",
+    "mod": 1690838400,
+    "author": "YukunTan",
+    "conflicts": [],
+    "targets": [
+        "anki21"
+    ]
+} 
