@@ -1,0 +1,2 @@
+[console_scripts]
+html2notion = html2notion.main:main

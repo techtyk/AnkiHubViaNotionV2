@@ -64,11 +64,50 @@ class AnkiNote(BaseNote):
     def get_children(self) -> list:
         """获取Anki正文内容（原ToNotionConverter逻辑）"""
         if "notion正文" in self.note:
-            return ToNotionConverter.convert_anki_html_to_notion_children(
+            original_notion_children = ToNotionConverter.convert_anki_html_to_notion_children(
                 self.note["notion正文"].strip()
             )
-        return []
-
+        model_field_notion_table=self._get_model_field_notion_table()
+        return model_field_notion_table +  original_notion_children if "notion正文" in self.note else model_field_notion_table
+    def _get_model_field_notion_table(self):
+        """将模板字段转换为Notion表格"""
+        table_rows = []
+        
+        # 添加表头
+        table_rows.append({
+            "type": "table_row",
+            "table_row": {
+                "cells": [
+                    [{"type": "text", "text": {"content": "字段名"}}],
+                    [{"type": "text", "text": {"content": "字段值"}}]
+                ]
+            }
+        })
+        
+        # 添加数据行（排除notion正文字段）
+        for field, value in self._template_fields.items():
+            if field == "notion正文":
+                continue
+                
+            table_rows.append({
+                "type": "table_row",
+                "table_row": {
+                    "cells": [
+                        [{"type": "text", "text": {"content": field}}],
+                        [{"type": "text", "text": {"content": str(value)}}]
+                    ]
+                }
+            })
+        
+        return [{
+            "type": "table",
+            "table": {
+                "table_width": 2,
+                "has_column_header": True,
+                "has_row_header": False,
+                "children": table_rows
+            }
+        }]
     def get_first_field_name(self):
         return self._meta_fields.get("First Field")
     
