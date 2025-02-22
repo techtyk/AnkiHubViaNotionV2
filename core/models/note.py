@@ -4,6 +4,7 @@ from aqt import mw
 import json
 from .parse_and_converter_helper import ToNotionConverter
 
+
 class BaseNote(ABC):
     """笔记抽象基类（抽象工厂模式）"""
     @abstractmethod
@@ -62,7 +63,7 @@ class AnkiNote(BaseNote):
         return {**self._meta_fields, **self._template_fields}
     
     def get_children(self) -> list:
-        """获取Anki正文内容（原ToNotionConverter逻辑）"""
+        """获取Anki正文内容"""
         if "notion正文" in self.note:
             original_notion_children = ToNotionConverter.convert_anki_html_to_notion_children(
                 self.note["notion正文"].strip()

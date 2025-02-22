@@ -1,5 +1,7 @@
 #处理anki笔记和各平台之间的笔记转换的问题
 import re
+from aqt.qt import debug
+from html import unescape
 
 VALID_LANGUAGES = {'python', 'javascript', 'java', 'c', 'c++', 'c#', 'html', 'css', 
                   'sql', 'typescript', 'php', 'ruby', 'go', 'swift', 'kotlin', 
@@ -29,9 +31,7 @@ class ToNotionConverter:
     @staticmethod
     def convert_anki_html_to_notion_children(html_content: str):
         # 转换函数：将 Anki 笔记中的 HTML 正文转换为 Notion children 块
-        import re
-        from html import unescape
-        
+
         # 处理代码块（提取语言参数）
         code_blocks = []
         def code_replacer(m):
@@ -65,12 +65,15 @@ class ToNotionConverter:
         
         # 重建代码块结构
         children = []
-        code_block_index = 0  # 添加独立的代码块索引计数器
-        for part in re.split(r'__CODE_BLOCK_(\d+)__', html_content):
-            if part.isdigit():
+        # 利用 re.split 会返回: [文本, 占位符, 文本, 占位符, …]
+        parts = re.split(r'__CODE_BLOCK_(\d+)__', html_content)
+        for idx, part in enumerate(parts):
+        # 调试点：查看当前部分及其索引
+            if idx % 2 == 1:
+                # 奇数索引部分：为代码块占位符（这里的 part 一定为纯数字）
                 index = int(part)
+                # 调试点：检查代码块索引
                 if index < len(code_blocks):
-                    # 使用单独的索引变量来避免与循环索引混淆
                     children.append({
                         "object": "block",
                         "type": "code",
@@ -79,20 +82,21 @@ class ToNotionConverter:
                             "language": code_blocks[index]['lang'] if code_blocks[index]['lang'] in VALID_LANGUAGES else "plain text"
                         }
                     })
-                    code_block_index += 1  # 只有成功替换时才递增
                 else:
-                    # 没有更多代码块时保留原始文本
                     children.append({
                         "object": "block",
                         "type": "paragraph",
                         "paragraph": {"rich_text": [{"type": "text", "text": {"content": "【代码块解析错误】"}}]}
                     })
-            elif part.strip():
-                children.append({
-                    "object": "block",
-                    "type": "paragraph",
-                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": part.strip()}}]}
-                })
+            else:
+                # 偶数索引部分：普通文本，不会误判为代码块占位符
+                if part.strip():
+                    # 调试点：检查普通文本部分
+                    children.append({
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {"rich_text": [{"type": "text", "text": {"content": part.strip()}}]}
+                    })
         
         return children
     pass

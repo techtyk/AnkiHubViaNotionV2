@@ -3,7 +3,7 @@
     "notion_database_url": "https://www.notion.so/19c12e5fa8e18020a1a4d720563853e4?v=19c12e5fa8e181c59500000ca0b42ae2",
     "anki_query_string": "deck:新牌组::系统默认",
     "duplicate_handling_way": "copy",
-    "delete_source_note": true,
+    "delete_source_note": false,
     "language": "中文",
     "retain_notion_children": true
 }
