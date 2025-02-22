@@ -89,9 +89,8 @@ class AnkiNote(BaseNote):
             # 新卡片，due 表示新卡位置，无法确定具体日期
             return None
         elif card.type == 1:
-            # 学习中卡片，due 是相对时间，单位为秒
-            due = time.time() + (card.due * 60)
-            return datetime.fromtimestamp(due)
+            # 学习中的卡片，due是Unix时间戳（秒）
+            return datetime.fromtimestamp(card.due)
         elif card.type == 2:
             # 复习卡片，due 是天数
             due = (card.due - col.sched.today) * 86400 + time.time()
