@@ -12,7 +12,7 @@ class NotionClient:
         self.token = token
         self.client = Client(auth=token)
 
-    def batch_update_database(self, database_id, notes_data,config):
+    def batch_update_database(self, database_id, notes_data, config_manager):
         """
         批量更新 Notion 数据库：
           - copy 模式直接创建新页面，不检查重复
@@ -24,8 +24,16 @@ class NotionClient:
 
         for note_data in notes_data:
             try:
+
+                # 将重复检查逻辑封装到客户端内部
+                dup_filter = self._build_duplicate_filter(
+                    note_type=note_data["note_type"],
+                    first_field_name=note_data["first_field"]["name"],
+                    first_field_value=note_data["first_field"]["value"]
+                )
+
                 # 每次循环时从最新的配置中读取处理模式
-                mode = config.get("duplicate_handling_way", "keep").lower()
+                mode = config_manager.reload_config().get("duplicate_handling_way", "keep").lower()
 
                 # copy 模式：直接创建新页面
                 if mode == "copy":
@@ -43,7 +51,7 @@ class NotionClient:
                     continue
 
                 # 其它模式：先进行重复检查
-                dup_filter = note_data['duplicate_check']['filter']
+
                 query = self.client.databases.query(database_id=database_id, filter=dup_filter)
                 # 如果存在重复页面
                 if query.get('results'):
@@ -97,8 +105,17 @@ class NotionClient:
                     'error': str(e),
                     'trace': traceback.format_exc()
                 })
-
+        
         return {
             'success': success,
             'failed': failed
+        }
+
+    
+    def _build_duplicate_filter(self, note_type, first_field_name, first_field_value):
+        return {
+            "and": [
+                {"property": "Note Type", "rich_text": {"equals": note_type}},
+                {"property": first_field_name, "rich_text": {"equals": first_field_value}}
+            ]
         }
