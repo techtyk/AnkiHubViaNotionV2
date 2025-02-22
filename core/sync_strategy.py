@@ -8,6 +8,7 @@ import json
 import os
 from .notion_client import NotionClient
 from aqt.qt import debug
+from .config_manager import ConfigManager
 
 VALID_LANGUAGES = {'python', 'javascript', 'java', 'c', 'c++', 'c#', 'html', 'css', 
                   'sql', 'typescript', 'php', 'ruby', 'go', 'swift', 'kotlin', 
@@ -17,24 +18,26 @@ class SyncStrategy(ABC):
     """同步策略抽象基类（策略模式）"""
     
     @abstractmethod
-    def execute(self, config: Dict[str, Any]):
+    def execute(self):
         """执行同步操作"""
         pass
 
 class AnkiToNotionStrategy(SyncStrategy):
     """Anki → Notion 同步策略"""
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config_manager: ConfigManager):
         # 初始化 Notion 客户端
-        self.client = NotionClient(config.get('notion_token'))
-        self.database_id = Helpers.extract_database_id(config.get('notion_database_url'))
+        self.config_manager = config_manager
+        self.client = NotionClient(self.config_manager.reload_config().get('notion_token'))
+        self.database_id = Helpers.extract_database_id(self.config_manager.reload_config().get('notion_database_url'))
 
-    def execute(self, config: Dict[str, Any]):
+    def execute(self):
         # 具体实现分为3个步骤:1-提取ids，2-确保数据库符合预期，3-更新notion数据库
         note_ids = self._get_anki_notes_ids()
         # 确保数据库结构符合预期，不存在或类型不匹配的属性自动更新
         self._ensure_database_structure(note_ids)
-        result = self._update_notion_database(note_ids, config)
+
+        result = self._update_notion_database(note_ids)
         
         # 根据返回结果提取实际成功同步的笔记ID
         '''添加 if op.get("operation") 的作用是为了筛选出那些实际进行了"操作"的记录。原因如下：
@@ -43,8 +46,8 @@ class AnkiToNotionStrategy(SyncStrategy):
         # debug()
         succeeded_ids = [item["operation"]["note_id"] for item in result.get("success", []) if item.get("action") in ["create", "update"]]
         
-        # 根据配置决定是否删除源笔记（V2逻辑：配置项为True时删除）
-        if config.get("delete_source_note"):
+        # 根据配置决定是否删除源笔记
+        if self.config_manager.reload_config().get("delete_source_note"):
             self._delete_source_notes(succeeded_ids)
         
         self._show_sync_result(result)
@@ -57,13 +60,13 @@ class AnkiToNotionStrategy(SyncStrategy):
         note_ids = mw.col.find_notes(query)
         return note_ids
 
-    def _update_notion_database(self, note_ids, config):
+    def _update_notion_database(self, note_ids):
         """
         更新 Notion 数据库。每次调用时都通过 mw.addonManager.getConfig 获取最新配置，
         这样用户在设置界面修改 duplicate_handling_way 后不必重启 Anki 就能生效。
         """
         # 修改为显式指定插件主模块名称
-        config = mw.addonManager.getConfig("anki_repository_v2")
+        config = self.config_manager.reload_config()
         
 
         
@@ -75,7 +78,7 @@ class AnkiToNotionStrategy(SyncStrategy):
             notion_children = self._convert_to_notion_children(note_body) if note_body else None
 
             processed_note = self._process_note(note)
-            properties = self._convert_into_notion_properties(processed_note, config)
+            properties = self._convert_into_notion_properties(processed_note)
             
             # 修改重复检查条件：
             # 1. 从 "First Field" 读取真实的首字段名称
@@ -148,7 +151,7 @@ class AnkiToNotionStrategy(SyncStrategy):
         meta_fields_from_anki = Helpers.write_fsrs_data(note, meta_fields_from_anki)
         return meta_fields_from_anki
 
-    def _convert_into_notion_properties(self, note_data, config):
+    def _convert_into_notion_properties(self, note_data):
         """
         根据处理后的笔记数据构建 Notion 页面属性字典
         """
@@ -316,7 +319,7 @@ class AnkiToNotionStrategy(SyncStrategy):
 class NotionToAnkiStrategy(SyncStrategy):
     """Notion → Anki 同步策略"""
     
-    def execute(self, config: Dict[str, Any]):
+    def execute(self):
         # 通过executor获取配置
-        print(f"正在使用配置：{config}执行同步")
+        print("执行同步")
         # 具体同步逻辑...

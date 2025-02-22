@@ -3,22 +3,23 @@
 import json
 import os
 from typing import Dict, Any
+from aqt import mw 
 
 class ConfigManager:
-    _instance = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._config = {}
-            cls._instance.load_config()
-        return cls._instance
+    def __init__(self):
+        self.addon_name = __name__
+        self._config = {}
+        self.load_config()
 
     def load_config(self):
-        config_path = os.path.join(os.path.dirname(__file__), '../config.json')
-        if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
-                self._config = json.load(f)
+        """从Anki配置系统获取最新配置并更新实例"""
+        config = mw.addonManager.getConfig(self.addon_name)
+        if config is None:  # 精确判断是否为None
+            self._config = self._get_default_config()
+            logger.warning("警告，从配置文件获取配置失败，使用默认配置！")
+        else:
+            self._config = config
+        return self._config
 
     def save_config(self):
         config_path = os.path.join(os.path.dirname(__file__), '../config.json')
@@ -37,4 +38,17 @@ class ConfigManager:
             'settings': '设置' if self.get('language') == '中文' else 'Settings',
             'anki_to_notion': '同步到Notion' if self.get('language') == '中文' else 'Sync to Notion',
             'notion_to_anki': '从Notion同步' if self.get('language') == '中文' else 'Sync from Notion'
+        }
+    def reload_config(self):
+        """显式重新加载配置"""
+        return self.load_config()
+
+    def _get_default_config(self):
+        """提供默认配置"""
+        return {
+            "notion_token": "",
+            "notion_database_url": "",
+            "delete_source_note": False,
+            "duplicate_handling_way": "keep",
+            "language": "中文"
         }

@@ -17,7 +17,7 @@ from .core.config_manager import ConfigManager
 from .core.sync_executor import SyncExecutor
 from .core.sync_strategy import AnkiToNotionStrategy, NotionToAnkiStrategy
 
-# 初始化配置管理器（单例模式）
+
 config_manager = ConfigManager()
 
 def init_menu():
@@ -44,9 +44,8 @@ def open_settings():
     dialog.exec()
 
 def start_anki_to_notion():
-    config = mw.addonManager.getConfig(__name__)  # 获取当前插件配置
     executor = SyncExecutor()
-    executor.execute_strategy(AnkiToNotionStrategy(config))  # 传入配置参数
+    executor.execute_strategy(AnkiToNotionStrategy(config_manager))  # 传入配置参数
 
 def start_notion_to_anki():
     executor = SyncExecutor()

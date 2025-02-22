@@ -11,7 +11,7 @@ class SyncExecutor:
     def execute_strategy(self, strategy):
         """启动子进程执行策略"""
         def worker():
-            strategy.execute(self.config)
+            strategy.execute()
         worker()    
         # p = Process(target=worker)
         # p.start()
