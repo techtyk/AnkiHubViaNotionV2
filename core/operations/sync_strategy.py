@@ -7,6 +7,7 @@ from aqt.qt import debug
 from .config_manager import ConfigManager
 from ..models.note import NoteFactory
 from ..models.parse_and_converter_helper import parse_notion_https_for_database_id
+from aqt.utils import showInfo
 
 VALID_LANGUAGES = {'python', 'javascript', 'java', 'c', 'c++', 'c#', 'html', 'css', 
                   'sql', 'typescript', 'php', 'ruby', 'go', 'swift', 'kotlin', 
@@ -183,8 +184,7 @@ class AnkiToNotionStrategy(SourceToTargetSyncStrategy):
         mw.reset()
     def show_sync_result(self, result):
         """弹窗显示同步结果"""
-        print("同步完成！")
-        print(f"成功: {len(result['success'])}，失败: {len(result['failed'])}")
+        showInfo(f"同步完成！成功: {len(result['success'])}，失败: {len(result['failed'])}")
 
     @staticmethod
     def _convert_properties(properties):
