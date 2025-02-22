@@ -14,9 +14,9 @@ VALID_LANGUAGES = {'python', 'javascript', 'java', 'c', 'c++', 'c#', 'html', 'cs
 
 class SourceToTargetSyncStrategy(ABC):
     """同步策略抽象基类（策略模式）"""
-    @staticmethod
+
     @abstractmethod
-    def get_ids_from_source() -> Iterable:
+    def get_ids_from_source(self) -> Iterable:
         """从源侧获取需要传输的笔记id"""
         pass
     
@@ -219,7 +219,6 @@ class AnkiToNotionStrategy(SourceToTargetSyncStrategy):
                 notion_properties[field] = {"rich_text": [{"text": {"content": str(value)}}]}
             elif field == "First Field":
                 notion_properties[field] = {"rich_text": [{"text": {"content": str(value)}}]}
-                notion_properties["first_field"] = {"rich_text": [{"text": {"content": str(value)}}]}
             elif field == "Card Type":
                 notion_properties[field] = {"rich_text": [{"text": {"content": str(value)}}]}
             else:
