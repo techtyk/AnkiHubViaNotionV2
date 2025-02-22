@@ -13,9 +13,9 @@ if lib_path not in sys.path:
 print("lib_path:", lib_path)
 print("lib目录内容:", os.listdir(lib_path))
 
-from .core.config_manager import ConfigManager
-from .core.sync_executor import SyncExecutor
-from .core.sync_strategy import AnkiToNotionStrategy, NotionToAnkiStrategy
+from .core.operations.config_manager import ConfigManager
+from .core.operations.sync_executor import SyncExecutor
+from .core.operations.sync_strategy import AnkiToNotionStrategy, NotionToAnkiStrategy
 
 
 config_manager = ConfigManager()

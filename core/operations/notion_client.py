@@ -12,7 +12,7 @@ class NotionClient:
         self.token = token
         self.client = Client(auth=token)
 
-    def batch_update_database(self, database_id, operations, delete_source, config):
+    def batch_update_database(self, database_id, notes_data,config):
         """
         批量更新 Notion 数据库：
           - copy 模式直接创建新页面，不检查重复
@@ -22,7 +22,7 @@ class NotionClient:
         success = []
         failed = []
 
-        for op in operations:
+        for note_data in notes_data:
             try:
                 # 每次循环时从最新的配置中读取处理模式
                 mode = config.get("duplicate_handling_way", "keep").lower()
@@ -31,11 +31,11 @@ class NotionClient:
                 if mode == "copy":
                     create_response = self.client.pages.create(
                         parent={'database_id': database_id},
-                        properties=op['data'],
-                        children=op.get('children', [])
+                        properties=note_data['properties'],
+                        children=note_data.get('children', [])
                     )
                     success.append({
-                        'operation': op,
+                        'operation': note_data,
                         'action': 'create',
                         'page_id': create_response['id'],
                         'response': create_response,
@@ -43,7 +43,7 @@ class NotionClient:
                     continue
 
                 # 其它模式：先进行重复检查
-                dup_filter = op['duplicate_check']['filter']
+                dup_filter = note_data['duplicate_check']['filter']
                 query = self.client.databases.query(database_id=database_id, filter=dup_filter)
                 # 如果存在重复页面
                 if query.get('results'):
@@ -52,11 +52,11 @@ class NotionClient:
                         page_id = query['results'][0]['id']
                         update_response = self.client.pages.update(
                             page_id=page_id,
-                            properties=op['data'],
-                            children=op.get('children', [])
+                            properties=note_data['properties'],
+                            children=note_data.get('children', [])
                         )
                         success.append({
-                            'operation': op,
+                            'operation': note_data,
                             'action': 'update',
                             'page_id': page_id,
                             'response': update_response,
@@ -64,7 +64,7 @@ class NotionClient:
                     elif mode == "keep":
                         # 保留：跳过更新，保持现有页面
                         success.append({
-                            'operation': op,
+                            'operation': note_data,
                             'action': 'skip',
                             'page_id': query['results'][0]['id'],
                             'response': None,
@@ -72,7 +72,7 @@ class NotionClient:
                     else:
                         # 默认情况，同 keep
                         success.append({
-                            'operation': op,
+                            'operation': note_data,
                             'action': 'skip',
                             'page_id': query['results'][0]['id'],
                             'response': None,
@@ -81,11 +81,11 @@ class NotionClient:
                     # 若不存在重复，则创建新的 Notion 页面
                     create_response = self.client.pages.create(
                         parent={'database_id': database_id},
-                        properties=op['data'],
-                        children=op.get('children', [])
+                        properties=note_data['properties'],
+                        children=note_data.get('children', [])
                     )
                     success.append({
-                        'operation': op,
+                        'operation': note_data,
                         'action': 'create',
                         'page_id': create_response['id'],
                         'response': create_response,
@@ -93,7 +93,7 @@ class NotionClient:
             except Exception as e:
                 traceback.print_exc()
                 failed.append({
-                    'operation': op,
+                    'operation': note_data,
                     'error': str(e),
                     'trace': traceback.format_exc()
                 })

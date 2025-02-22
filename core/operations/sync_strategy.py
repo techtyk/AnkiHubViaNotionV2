@@ -3,12 +3,12 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any ,Iterable
 from datetime import datetime
 from aqt import mw
-from ..utils.helpers import Helpers
-import json
-import os
+from ...utils.helpers import Helpers
 from .notion_client import NotionClient
 from aqt.qt import debug
 from .config_manager import ConfigManager
+from ..models.note import NoteFactory
+from ..models.parse_and_converter_helper import parse_notion_https_for_database_id
 
 VALID_LANGUAGES = {'python', 'javascript', 'java', 'c', 'c++', 'c#', 'html', 'css', 
                   'sql', 'typescript', 'php', 'ruby', 'go', 'swift', 'kotlin', 
@@ -83,7 +83,7 @@ class AnkiToNotionStrategy(SourceToTargetSyncStrategy):
         # 初始化 Notion 客户端
         self.config_manager = config_manager
         self.client = NotionClient(self.config_manager.reload_config().get('notion_token'))
-        self.database_id = Helpers.extract_database_id(self.config_manager.reload_config().get('notion_database_url'))
+        self.database_id = parse_notion_https_for_database_id(self.config_manager.reload_config().get('notion_database_url'))
 
 
     def get_ids_from_source(self):
@@ -151,57 +151,31 @@ class AnkiToNotionStrategy(SourceToTargetSyncStrategy):
         更新 Notion 数据库。每次调用时都通过 mw.addonManager.getConfig 获取最新配置，
         这样用户在设置界面修改 duplicate_handling_way 后不必重启 Anki 就能生效。
         """
-        # 修改为显式指定插件主模块名称
+        # 获取最新的config参数
         config = self.config_manager.reload_config()
         
+        
         # 针对每条笔记构造 Notion 页面数据
-        batch_operations = []
+        notes_data_finded = []
         for note_id in note_ids:
-            note = mw.col.get_note(note_id)
-            note_body = note["notion正文"].strip() if "notion正文" in note.keys() else ""
-            notion_children = self._convert_to_notion_children(note_body) if note_body else None
-
-            processed_note = self._process_note(note)
-            properties = self._convert_into_notion_properties(processed_note)
+            anki_note = NoteFactory.create("anki", note_id)
             
-            # 修改重复检查条件：
-            # 1. 从 "First Field" 读取真实的首字段名称
-            # 2. 再从 properties 中取出该字段的实际值
-            first_field_property_name = properties["First Field"]["rich_text"][0]["text"]["content"]
-            first_field_value = properties[first_field_property_name]["rich_text"][0]["text"]["content"]
-            duplicate_check = {
-                "filter": {
-                    "and": [
-                        {
-                            "property": "Note Type",
-                            "rich_text": {
-                                "equals": properties["Note Type"]["rich_text"][0]["text"]["content"]
-                            }
-                        },
-                        {
-                            "property": first_field_property_name,
-                            "rich_text": {
-                                "equals": first_field_value
-                            }
-                        }
-                    ]
+            note_data = {
+                "properties": self._convert_properties(anki_note.get_properties()),
+                "children": anki_note.get_children(),
+                "note_id": note_id,
+                "note_type": anki_note.get_properties().get("Note Type"),
+                "first_field": {
+                    "name": anki_note.get_first_field_name(),
+                    "value": anki_note.get_first_field_value()
                 }
             }
-            # 构造 operation 字典
-            operation = {
-                "data": properties,
-                "duplicate_check": duplicate_check,
-                "note_id": note_id
-            }
-            if notion_children:
-                operation["children"] = notion_children
-            batch_operations.append(operation)
+            notes_data_finded.append(note_data)
         
         # 调用 NotionClient 内的批量更新接口
         result = self.client.batch_update_database(
             database_id=self.database_id,
-            operations=batch_operations,
-            delete_source=config.get("delete_source_note"),
+            notes_data=notes_data_finded,
             config=config
         )
         return result
@@ -217,12 +191,45 @@ class AnkiToNotionStrategy(SourceToTargetSyncStrategy):
         print("同步完成！")
         print(f"成功: {len(result['success'])}，失败: {len(result['failed'])}")
 
-    def _process_note(self, note):
-        """处理单个笔记的字段映射"""
-        return {
-            **{k: v for k, v in note.items() if k != "notion正文"},
-            **self._get_meta_fields(note)
-        }
+    @staticmethod
+    def _convert_properties(properties):
+        """
+        根据处理后的笔记数据构建 Notion 页面属性字典
+        """
+        notion_properties = {}  # 重命名变量避免覆盖输入参数
+        for field, value in properties.items():
+            if value is None:
+                continue
+            if field in {"Creation Time", "Modification Time", "Due Date"}:
+                notion_properties[field] = {"date": {"start": str(value)}}
+            elif field == "Tags":
+                if isinstance(value, str):
+                    tags = [tag.strip() for tag in value.split(",") if tag.strip()]
+                    notion_properties[field] = {"multi_select": [{"name": tag} for tag in tags]}
+                else:
+                    notion_properties[field] = {"multi_select": value}
+            elif field in {"Anki ID", "Review Count", "Ease Factor", "Interval", "Lapses", "Difficulty", "Stability", "Retrievability"}:
+                try:
+                    if isinstance(value, dict) and 'number' in value:
+                        numeric_value = value['number']
+                    else:
+                        numeric_value = float(value) if '.' in str(value) else int(value)
+                    notion_properties[field] = {"number": numeric_value}
+                except (ValueError, TypeError):
+                    print(f"字段 {field} 的值 {value} 无法转换为数字，已设置为 0")
+                    notion_properties[field] = {"number": 0}
+            elif field == "Suspended":
+                notion_properties[field] = {"checkbox": bool(value)}
+            elif field == "Note Type":
+                notion_properties[field] = {"rich_text": [{"text": {"content": str(value)}}]}
+            elif field == "First Field":
+                notion_properties[field] = {"rich_text": [{"text": {"content": str(value)}}]}
+                notion_properties["first_field"] = {"rich_text": [{"text": {"content": str(value)}}]}
+            elif field == "Card Type":
+                notion_properties[field] = {"rich_text": [{"text": {"content": str(value)}}]}
+            else:
+                notion_properties[field] = {"rich_text": [{"text": {"content": str(value)}}]}
+        return notion_properties
 
     def _get_meta_fields(self, note):
         """从anki数据库中提取元数据字段（参考 anki2notion.py 207-261 行）"""
