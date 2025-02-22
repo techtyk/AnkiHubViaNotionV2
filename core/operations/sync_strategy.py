@@ -1,9 +1,7 @@
 # 定义各同步方式的核心接口，使用了策略模式（Strategy Pattern）
 from abc import ABC, abstractmethod
 from typing import Dict, Any ,Iterable
-from datetime import datetime
 from aqt import mw
-from ...utils.helpers import Helpers
 from .notion_client import NotionClient
 from aqt.qt import debug
 from .config_manager import ConfigManager
@@ -181,7 +179,7 @@ class AnkiToNotionStrategy(SourceToTargetSyncStrategy):
         """安全删除已成功同步的源笔记"""
         if not succeeded_note_ids:
             return
-        mw.col.remNotes(succeeded_note_ids)
+        mw.col.remove_notes(succeeded_note_ids)
         mw.reset()
     def show_sync_result(self, result):
         """弹窗显示同步结果"""

@@ -65,17 +65,28 @@ class ToNotionConverter:
         
         # 重建代码块结构
         children = []
+        code_block_index = 0  # 添加独立的代码块索引计数器
         for part in re.split(r'__CODE_BLOCK_(\d+)__', html_content):
             if part.isdigit():
                 index = int(part)
-                children.append({
-                    "object": "block",
-                    "type": "code",
-                    "code": {
-                        "rich_text": [{"type": "text", "text": {"content": code_blocks[index]['content']}}],
-                        "language": code_blocks[index]['lang'] if code_blocks[index]['lang'] in VALID_LANGUAGES else "plain text"
-                    }
-                })
+                if index < len(code_blocks):
+                    # 使用单独的索引变量来避免与循环索引混淆
+                    children.append({
+                        "object": "block",
+                        "type": "code",
+                        "code": {
+                            "rich_text": [{"type": "text", "text": {"content": code_blocks[index]['content']}}],
+                            "language": code_blocks[index]['lang'] if code_blocks[index]['lang'] in VALID_LANGUAGES else "plain text"
+                        }
+                    })
+                    code_block_index += 1  # 只有成功替换时才递增
+                else:
+                    # 没有更多代码块时保留原始文本
+                    children.append({
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {"rich_text": [{"type": "text", "text": {"content": "【代码块解析错误】"}}]}
+                    })
             elif part.strip():
                 children.append({
                     "object": "block",
